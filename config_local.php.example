@@ -15,6 +15,15 @@
      * BEWARE : it has to end with a /
      */
     $config['calibre_directory'] = './';
+    // --------------------------------------------------------------------------------
+    // -- Fix for incompatibility older sqlite3 & Calibre v5 database format
+    // true will create metadata.dbv4 and use that copy
+    $config['sqlite_fix'] = true;
+    $config['dumpfile'] = '/tmp/metadata.dump';
+    $config['sqlite3pgm'] = '/opt/bin/sqlite3';
+    // leave this false unless debugging is required with url /getJSON.php?complete=1
+    $config['sqlite_fix_debug'] = false;  
+    // --------------------------------------------------------------------------------
     
     /*
      * Catalog's title

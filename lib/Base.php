@@ -99,7 +99,55 @@ abstract class Base
 
 
     public static function getDbFileName ($database = NULL) {
-        return self::getDbDirectory ($database) .'metadata.db';
+        global $config;
+        $dbdir = self::getDbDirectory ($database);
+        $dbfile = 'metadata.db';
+        // check if v4 fix is required
+        if ($config['sqlite_fix']) {
+            $debug = $config['sqlite_fix_debug'];
+            $sqlite3pgm = $config['sqlite3pgm'];
+            $dumpfile = $config['dumpfile'];
+            // define v5 and v4 database names
+            $dbfilename = $dbdir.$dbfile;
+            $dbfilenamev4 =  $dbfilename.'v4';
+            // Get Modification DateTime for both 
+            $mod_date = filemtime($dbfilename);
+            if (file_exists($dbfilenamev4)) {
+                $mod_datev4 = filemtime($dbfilenamev4);
+            } else {
+                $mod_datev4 = 0;
+            }
+            if ($debug) echo("v4:$dbfilenamev4 - $mod_datev4\n");
+            if ($debug) echo("v5:$dbfilename --- $mod_date \n");
+            // regenerate v4 db when v5 db was updated
+            if ($mod_datev4 < $mod_date) {
+                //***dump current v5 db
+                exec($sqlite3pgm.' '.$dbfilename.' .dump >'.$dumpfile , $out, $retval);
+                if ($debug) {
+                    echo("Dump $dbfilename \n");
+                    echo($sqlite3pgm.' '.$dbfilename.' .dump >'.$dumpfile);
+                    var_dump($retval);
+                    print_r($out);
+                }
+                //***remove current v4 db
+                exec('rm -f '.$dbfilenamev4, $out, $retval);
+                if ($debug) {
+                    echo("remove v4 db \n");
+                    var_dump($retval);
+                    print_r($out); 
+                }
+                //***Import dump from v5 db which will remove the: near "without": syntax error
+                exec($sqlite3pgm.' '.$dbfilenamev4.' < '.$dumpfile, $out, $retval);
+                if ($debug) {
+                    echo("Create $dbfilenamev4 \n");
+                    var_dump($retval);
+                    print_r($out);
+                }
+            }
+            // use the v4 version
+            $dbfile = $dbfile.'v4';
+        }
+        return $dbdir.$dbfile;
     }
 
     private static function error ($database) {
