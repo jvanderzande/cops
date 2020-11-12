@@ -119,8 +119,20 @@ abstract class Base
             }
             if ($debug) echo("v4:$dbfilenamev4 - $mod_datev4\n");
             if ($debug) echo("v5:$dbfilename --- $mod_date \n");
-            // regenerate v4 db when v5 db was updated
-            if ($mod_datev4 < $mod_date) {
+            // Pause in case an update is already running
+            while (file_exists($dbdir.'updaterunning')) {
+                // kill it when older than 10 seconds to break the loop
+                if (filemtime($dbdir.'updaterunning') + 10 < time ())
+                    unlink($dbdir.'updaterunning');
+                if ($debug) echo("Waiting for v4 update process.\n");
+                usleep(500000); //wait 500 msec
+            }
+             // regenerate v4 db when v5 db was updated
+            if ($mod_datev4 < $mod_date || filesize($dbfilenamev4 ) > filesize( $dbfilename )) {
+                // create processing indicator file
+                $bfile = fopen($dbdir.'updaterunning', "w");
+                fwrite($bfile, "processing");
+                fclose($bfile);
                 //***dump current v5 db
                 exec($sqlite3pgm.' '.$dbfilename.' .dump >'.$dumpfile , $out, $retval);
                 if ($debug) {
@@ -130,12 +142,7 @@ abstract class Base
                     print_r($out);
                 }
                 //***remove current v4 db
-                exec('rm -f '.$dbfilenamev4, $out, $retval);
-                if ($debug) {
-                    echo("remove v4 db \n");
-                    var_dump($retval);
-                    print_r($out); 
-                }
+                unlink($dbfilenamev4);
                 //***Import dump from v5 db which will remove the: near "without": syntax error
                 exec($sqlite3pgm.' '.$dbfilenamev4.' < '.$dumpfile, $out, $retval);
                 if ($debug) {
@@ -143,6 +150,8 @@ abstract class Base
                     var_dump($retval);
                     print_r($out);
                 }
+                // remove processing indicator file
+                unlink($dbdir.'updaterunning');
             }
             // use the v4 version
             $dbfile = $dbfile.'v4';
